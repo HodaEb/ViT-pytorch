@@ -224,17 +224,18 @@ def train(args, model):
 
     # load weights
     # checkpoint_file = os.listdir(args.input_dir)
-    checkpoint_file = args.input_dir
-    # if checkpoints:
-        # checkpoint_file = os.path.join(args.input_dir, checkpoints[0])
-    checkpoint = torch.load(checkpoint_file)
-    if 'model_state_dict' in checkpoint.keys():
-        model.load_state_dict(checkpoint['model_state_dict'])
-        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        # global_step = checkpoint['step'] + 1
-        best_acc = checkpoint['best_accuracy']
-    else:
-        model.load_state_dict(checkpoint)
+    if args.input_dir:
+        checkpoint_file = args.input_dir
+        # if checkpoints:
+            # checkpoint_file = os.path.join(args.input_dir, checkpoints[0])
+        checkpoint = torch.load(checkpoint_file)
+        if 'model_state_dict' in checkpoint.keys():
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            # global_step = checkpoint['step'] + 1
+            best_acc = checkpoint['best_accuracy']
+        else:
+            model.load_state_dict(checkpoint)
 
     model.zero_grad()
     set_seed(args)  # Added here for reproducibility (even between python 2 and 3)
@@ -319,8 +320,11 @@ def main():
                         default="/content/drive/MyDrive/ViT_weights_layer11_to_end/every_checkpoint/", type=str,
                         help="The output directory where checkpoints will be written.")
     parser.add_argument("--input_dir", 
-                        default="/content/drive/MyDrive/ViT_weights_layer11_to_end/stanford40-1_checkpoint.pth", type=str,
+                        default="/content/drive/MyDrive/Copy of stanford40-1_checkpoint.bin", type=str,
                         help="The output directory where checkpoints will be written.")
+    # parser.add_argument("--input_dir", 
+    #                     default= None, type=str,
+    #                     help="The output directory where checkpoints will be written.")
 
     parser.add_argument("--img_size", default=224, type=int,
                         help="Resolution size")
