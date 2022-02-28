@@ -172,10 +172,13 @@ def train(args, model):
 
     # Trainable Parameters
     for name, param in model.named_parameters():
-        # if 'transformer.encoder.layer.11' in name:
-        #     param.requires_grad_(True)
-        #     print(name)
-        if 'head.weight' in name or \
+        if 'transformer.encoder.layer.11' in name:
+            param.requires_grad_(True)
+            print(name)
+        elif 'transformer.encoder.layer.10' in name:
+            param.requires_grad_(True)
+            print(name)
+        elif 'head.weight' in name or \
             'head.bias' in name:
             param.requires_grad_(True)
             print(name)
@@ -228,7 +231,7 @@ def train(args, model):
     if 'model_state_dict' in checkpoint.keys():
         model.load_state_dict(checkpoint['model_state_dict'])
         # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        global_step = checkpoint['step'] + 1
+        # global_step = checkpoint['step'] + 1
         best_acc = checkpoint['best_accuracy']
     else:
         model.load_state_dict(checkpoint)
