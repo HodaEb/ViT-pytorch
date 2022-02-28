@@ -11,6 +11,7 @@ from datetime import timedelta
 
 import torch
 import torch.distributed as dist
+from torch.utils.data import dataset
 
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -54,12 +55,30 @@ def save_model(args, model):
     torch.save(model_to_save.state_dict(), model_checkpoint)
     logger.info("Saved model checkpoint to [DIR: %s]", args.output_dir)
 
+def save_model_complete(args, model, optimizer, accuracy = None, step = 0):
+    if not accuracy:
+        checkpoint_file = os.path.join(args.output_dir_every_checkpoint, "step_{}_checkpoint.pth".format(step))
+    else:
+        checkpoint_file = os.path.join(args.output_dir, "best_acc_step_{}_acc_{}_checkpoint.pth".format(step, accuracy))
+    torch.save({
+        'step': step,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'best_accuracy': accuracy,
+    }, checkpoint_file)
+    logger.info("Saved model checkpoint to [DIR: %s]", args.output_dir)
+
 
 def setup(args):
     # Prepare model
     config = CONFIGS[args.model_type]
 
-    num_classes = 10 if args.dataset == "cifar10" else 100
+    if args.dataset == "cifar10":
+        num_classes = 10 
+    elif args.dataset == "stanford40":
+        num_classes = 40
+    else:
+        num_classes = 100
 
     model = VisionTransformer(config, args.img_size, zero_head=True, num_classes=num_classes)
     model.load_from(np.load(args.pretrained_dir))
@@ -135,6 +154,8 @@ def valid(args, model, writer, test_loader, global_step):
     logger.info("Valid Accuracy: %2.5f" % accuracy)
 
     writer.add_scalar("test/accuracy", scalar_value=accuracy, global_step=global_step)
+    writer.add_scalar("test/loss", scalar_value=eval_losses.avg, global_step=global_step)
+
     return accuracy
 
 
@@ -148,6 +169,23 @@ def train(args, model):
 
     # Prepare dataset
     train_loader, test_loader = get_loader(args)
+
+    # Trainable Parameters
+    for name, param in model.named_parameters():
+        # if 'transformer.encoder.layer.11' in name:
+        #     param.requires_grad_(True)
+        #     print(name)
+        if 'head.weight' in name or \
+            'head.bias' in name:
+            param.requires_grad_(True)
+            print(name)
+        elif 'transformer.encoder.encoder_norm.weight' in name \
+                or 'transformer.encoder.encoder_norm.bias' in name:
+            param.requires_grad_(True)
+            print(name)
+        else:
+            param.requires_grad_(False)
+
 
     # Prepare optimizer and scheduler
     optimizer = torch.optim.SGD(model.parameters(),
@@ -179,10 +217,26 @@ def train(args, model):
                     torch.distributed.get_world_size() if args.local_rank != -1 else 1))
     logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
 
+    global_step, best_acc = 0, 0
+
+    # load weights
+    # checkpoint_file = os.listdir(args.input_dir)
+    checkpoint_file = args.input_dir
+    # if checkpoints:
+        # checkpoint_file = os.path.join(args.input_dir, checkpoints[0])
+    checkpoint = torch.load(checkpoint_file)
+    if 'model_state_dict' in checkpoint.keys():
+        model.load_state_dict(checkpoint['model_state_dict'])
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        global_step = checkpoint['step'] + 1
+        best_acc = checkpoint['best_accuracy']
+    else:
+        model.load_state_dict(checkpoint)
+
     model.zero_grad()
     set_seed(args)  # Added here for reproducibility (even between python 2 and 3)
     losses = AverageMeter()
-    global_step, best_acc = 0, 0
+    # global_step, best_acc = 0, 0
     while True:
         model.train()
         epoch_iterator = tqdm(train_loader,
@@ -220,10 +274,14 @@ def train(args, model):
                 if args.local_rank in [-1, 0]:
                     writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
                     writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
+                # save_checkpoint
+                # save_model_complete(args, model, optimizer, accuracy = None, step = global_step)
+                
                 if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
                     accuracy = valid(args, model, writer, test_loader, global_step)
+                    writer.add_scalar("test/acc", scalar_value=accuracy, global_step=global_step)
                     if best_acc < accuracy:
-                        save_model(args, model)
+                        save_model_complete(args, model, optimizer, accuracy, global_step)
                         best_acc = accuracy
                     model.train()
 
@@ -244,7 +302,7 @@ def main():
     # Required parameters
     parser.add_argument("--name", required=True,
                         help="Name of this run. Used for monitoring.")
-    parser.add_argument("--dataset", choices=["cifar10", "cifar100"], default="cifar10",
+    parser.add_argument("--dataset", choices=["cifar10", "cifar100", "stanford40"], default="cifar10",
                         help="Which downstream task.")
     parser.add_argument("--model_type", choices=["ViT-B_16", "ViT-B_32", "ViT-L_16",
                                                  "ViT-L_32", "ViT-H_14", "R50-ViT-B_16"],
@@ -252,7 +310,13 @@ def main():
                         help="Which variant to use.")
     parser.add_argument("--pretrained_dir", type=str, default="checkpoint/ViT-B_16.npz",
                         help="Where to search for pretrained ViT models.")
-    parser.add_argument("--output_dir", default="output", type=str,
+    parser.add_argument("--output_dir", default="/content/drive/MyDrive/ViT_weights_layer11_to_end/", type=str,
+                        help="The output directory where checkpoints will be written.")
+    parser.add_argument("--output_dir_every_checkpoint", 
+                        default="/content/drive/MyDrive/ViT_weights_layer11_to_end/every_checkpoint/", type=str,
+                        help="The output directory where checkpoints will be written.")
+    parser.add_argument("--input_dir", 
+                        default="/content/drive/MyDrive/ViT_weights_layer11_to_end/stanford40-1_checkpoint.pth", type=str,
                         help="The output directory where checkpoints will be written.")
 
     parser.add_argument("--img_size", default=224, type=int,
@@ -265,7 +329,9 @@ def main():
                         help="Run prediction on validation set every so many steps."
                              "Will always run one evaluation at the end of training.")
 
-    parser.add_argument("--learning_rate", default=3e-2, type=float,
+    # parser.add_argument("--learning_rate", default=3e-2, type=float,
+    #                     help="The initial learning rate for SGD.")
+    parser.add_argument("--learning_rate", default=3e-5, type=float,
                         help="The initial learning rate for SGD.")
     parser.add_argument("--weight_decay", default=0, type=float,
                         help="Weight deay if we apply some.")
