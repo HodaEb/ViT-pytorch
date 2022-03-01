@@ -170,38 +170,43 @@ def train(args, model):
     # Prepare dataset
     train_loader, test_loader = get_loader(args)
 
-   # # Trainable Parameters
-    # for name, param in model.named_parameters():
-    #     if 'transformer.encoder.layer.11' in name:
-    #         param.requires_grad_(True)
-    #         print(name)
-    #     elif 'transformer.encoder.layer.10' in name:
-    #         param.requires_grad_(True)
-    #         print(name)
-    #     elif 'head.weight' in name or \
-    #         'head.bias' in name:
-    #         param.requires_grad_(True)
-    #         print(name)
-    #     elif 'transformer.encoder.encoder_norm.weight' in name \
-    #             or 'transformer.encoder.encoder_norm.bias' in name:
-    #         param.requires_grad_(True)
-    #         print(name)
-    #     else:
-    #         param.requires_grad_(False)
+  #  # Trainable Parameters
+  #   for name, param in model.named_parameters():
+  #       if 'transformer.encoder.layer.11' in name:
+  #           param.requires_grad_(True)
+  #           print(name)
+  #       elif 'transformer.encoder.layer.10' in name:
+  #           param.requires_grad_(True)
+  #           print(name)
+  #       elif 'head.weight' in name or \
+  #           'head.bias' in name:
+  #           param.requires_grad_(True)
+  #           print(name)
+  #       elif 'transformer.encoder.encoder_norm.weight' in name \
+  #               or 'transformer.encoder.encoder_norm.bias' in name:
+  #           param.requires_grad_(True)
+  #           print(name)
+  #       else:
+  #          param.requires_grad_(False)
 
 
     # Prepare optimizer and scheduler
-    optimizer = torch.optim.SGD(model.parameters(),
+    # optimizer = torch.optim.SGD(model.parameters(),
+    #                             lr=args.learning_rate,
+    #                             momentum=0.9,
+    #                             weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(),
                                 lr=args.learning_rate,
-                                momentum=0.9,
-                                weight_decay=args.weight_decay)
+                                # momentum=0.9,
+                                # weight_decay=args.weight_decay
+                                )
     t_total = args.num_steps
     # if args.decay_type == "cosine":
     #     scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
     # else:
     #     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
 
-    scheduler =torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= t_total*2, eta_min=0, last_epoch=- 1, verbose=False)
+    scheduler =torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= t_total, eta_min=0, last_epoch=-1, verbose=False)
 
     if args.fp16:
         model, optimizer = amp.initialize(models=model,
@@ -321,17 +326,19 @@ def main():
     parser.add_argument("--output_dir_every_checkpoint", 
                         default="/content/drive/MyDrive/ViT_weights_layer11_to_end/every_checkpoint/", type=str,
                         help="The output directory where checkpoints will be written.")
-    parser.add_argument("--input_dir", 
-                        default="/content/drive/MyDrive/ViT_weights_layer11_to_end/best_acc_step_500_acc_0.9063629790310919_checkpoint.pth", type=str,
-                        help="The output directory where checkpoints will be written.")
     # parser.add_argument("--input_dir", 
-    #                     default= None, type=str,
+    #                     default="/content/drive/MyDrive/ViT_weights_layer11_to_end/best_acc_step_500_acc_0.9063629790310919_checkpoint.pth", type=str,
     #                     help="The output directory where checkpoints will be written.")
+    parser.add_argument("--input_dir", 
+                        default= None, type=str,
+                        help="The output directory where checkpoints will be written.")
 
     parser.add_argument("--img_size", default=224, type=int,
                         help="Resolution size")
     parser.add_argument("--train_batch_size", default=512, type=int,
                         help="Total batch size for training.")
+    # parser.add_argument("--train_batch_size", default=40, type=int,
+    #                     help="Total batch size for training.")
     parser.add_argument("--eval_batch_size", default=64, type=int,
                         help="Total batch size for eval.")
     parser.add_argument("--eval_every", default=100, type=int,
