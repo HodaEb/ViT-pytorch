@@ -233,7 +233,7 @@ def train(args, model):
         checkpoint = torch.load(checkpoint_file)
         if 'model_state_dict' in checkpoint.keys():
             model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             # global_step = checkpoint['step'] + 1
             best_acc = checkpoint['best_accuracy']
         else:
@@ -316,17 +316,17 @@ def main():
                         help="Which variant to use.")
     parser.add_argument("--pretrained_dir", type=str, default="checkpoint/ViT-B_16.npz",
                         help="Where to search for pretrained ViT models.")
-    parser.add_argument("--output_dir", default="/content/drive/MyDrive/ViT_weights_layer11_to_end/", type=str,
+    parser.add_argument("--output_dir", default="/content/drive/MyDrive/ViT_weights_500_continue/", type=str,
                         help="The output directory where checkpoints will be written.")
     parser.add_argument("--output_dir_every_checkpoint", 
                         default="/content/drive/MyDrive/ViT_weights_layer11_to_end/every_checkpoint/", type=str,
                         help="The output directory where checkpoints will be written.")
-    # parser.add_argument("--input_dir", 
-    #                     default="/content/drive/MyDrive/Copy of stanford40-1_checkpoint.bin", type=str,
-    #                     help="The output directory where checkpoints will be written.")
     parser.add_argument("--input_dir", 
-                        default= None, type=str,
+                        default="/content/drive/MyDrive/ViT_weights_layer11_to_end/best_acc_step_500_acc_0.9063629790310919_checkpoint.pth", type=str,
                         help="The output directory where checkpoints will be written.")
+    # parser.add_argument("--input_dir", 
+    #                     default= None, type=str,
+    #                     help="The output directory where checkpoints will be written.")
 
     parser.add_argument("--img_size", default=224, type=int,
                         help="Resolution size")
@@ -340,7 +340,7 @@ def main():
 
     # parser.add_argument("--learning_rate", default=3e-2, type=float,
     #                     help="The initial learning rate for SGD.")
-    parser.add_argument("--learning_rate", default=3e-3, type=float,
+    parser.add_argument("--learning_rate", default=3e-4, type=float,
                         help="The initial learning rate for SGD.")
     parser.add_argument("--weight_decay", default=0, type=float,
                         help="Weight deay if we apply some.")
