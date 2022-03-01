@@ -170,24 +170,24 @@ def train(args, model):
     # Prepare dataset
     train_loader, test_loader = get_loader(args)
 
-    # Trainable Parameters
-    for name, param in model.named_parameters():
-        if 'transformer.encoder.layer.11' in name:
-            param.requires_grad_(True)
-            print(name)
-        elif 'transformer.encoder.layer.10' in name:
-            param.requires_grad_(True)
-            print(name)
-        elif 'head.weight' in name or \
-            'head.bias' in name:
-            param.requires_grad_(True)
-            print(name)
-        elif 'transformer.encoder.encoder_norm.weight' in name \
-                or 'transformer.encoder.encoder_norm.bias' in name:
-            param.requires_grad_(True)
-            print(name)
-        else:
-            param.requires_grad_(False)
+   # # Trainable Parameters
+    # for name, param in model.named_parameters():
+    #     if 'transformer.encoder.layer.11' in name:
+    #         param.requires_grad_(True)
+    #         print(name)
+    #     elif 'transformer.encoder.layer.10' in name:
+    #         param.requires_grad_(True)
+    #         print(name)
+    #     elif 'head.weight' in name or \
+    #         'head.bias' in name:
+    #         param.requires_grad_(True)
+    #         print(name)
+    #     elif 'transformer.encoder.encoder_norm.weight' in name \
+    #             or 'transformer.encoder.encoder_norm.bias' in name:
+    #         param.requires_grad_(True)
+    #         print(name)
+    #     else:
+    #         param.requires_grad_(False)
 
 
     # Prepare optimizer and scheduler
@@ -196,10 +196,12 @@ def train(args, model):
                                 momentum=0.9,
                                 weight_decay=args.weight_decay)
     t_total = args.num_steps
-    if args.decay_type == "cosine":
-        scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
-    else:
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
+    # if args.decay_type == "cosine":
+    #     scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
+    # else:
+    #     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
+
+    scheduler =torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= t_total*2, eta_min=0, last_epoch=- 1, verbose=False)
 
     if args.fp16:
         model, optimizer = amp.initialize(models=model,
@@ -319,12 +321,12 @@ def main():
     parser.add_argument("--output_dir_every_checkpoint", 
                         default="/content/drive/MyDrive/ViT_weights_layer11_to_end/every_checkpoint/", type=str,
                         help="The output directory where checkpoints will be written.")
-    parser.add_argument("--input_dir", 
-                        default="/content/drive/MyDrive/Copy of stanford40-1_checkpoint.bin", type=str,
-                        help="The output directory where checkpoints will be written.")
     # parser.add_argument("--input_dir", 
-    #                     default= None, type=str,
+    #                     default="/content/drive/MyDrive/Copy of stanford40-1_checkpoint.bin", type=str,
     #                     help="The output directory where checkpoints will be written.")
+    parser.add_argument("--input_dir", 
+                        default= None, type=str,
+                        help="The output directory where checkpoints will be written.")
 
     parser.add_argument("--img_size", default=224, type=int,
                         help="Resolution size")
@@ -338,7 +340,7 @@ def main():
 
     # parser.add_argument("--learning_rate", default=3e-2, type=float,
     #                     help="The initial learning rate for SGD.")
-    parser.add_argument("--learning_rate", default=3e-5, type=float,
+    parser.add_argument("--learning_rate", default=3e-3, type=float,
                         help="The initial learning rate for SGD.")
     parser.add_argument("--weight_decay", default=0, type=float,
                         help="Weight deay if we apply some.")
