@@ -4,6 +4,7 @@ import torch
 
 from torchvision import transforms, datasets
 from torch.utils.data import DataLoader, RandomSampler, DistributedSampler, SequentialSampler
+from torchvision.transforms.transforms import RandomVerticalFlip
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def get_loader(args):
         transform_train = transforms.Compose([
             transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.05, 1.0)),
             transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
             transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
             # transforms.RandomGrayscale(0.2),
             transforms.ToTensor(),
