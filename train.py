@@ -191,22 +191,22 @@ def train(args, model):
 
 
     # Prepare optimizer and scheduler
-    # optimizer = torch.optim.SGD(model.parameters(),
-    #                             lr=args.learning_rate,
-    #                             momentum=0.9,
-    #                             weight_decay=args.weight_decay)
-    optimizer = torch.optim.Adam(model.parameters(),
+    optimizer = torch.optim.SGD(model.parameters(),
                                 lr=args.learning_rate,
-                                # momentum=0.9,
-                                # weight_decay=args.weight_decay
-                                )
+                                momentum=0.9,
+                                weight_decay=args.weight_decay)
+    # optimizer = torch.optim.Adam(model.parameters(),
+    #                             lr=args.learning_rate,
+    #                             # momentum=0.9,
+    #                             # weight_decay=args.weight_decay
+    #                             )
     t_total = args.num_steps
-    # if args.decay_type == "cosine":
-    #     scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
-    # else:
-    #     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
+    if args.decay_type == "cosine":
+        scheduler = WarmupCosineSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
+    else:
+        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
 
-    scheduler =torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= t_total, eta_min=0, last_epoch=-1, verbose=False)
+    # scheduler =torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max= t_total, eta_min=0, last_epoch=-1, verbose=False)
 
     if args.fp16:
         model, optimizer = amp.initialize(models=model,
@@ -284,13 +284,13 @@ def train(args, model):
                 )
                 if args.local_rank in [-1, 0]:
                     writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
-                    writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
+                    writer.add_scalar("train/lr", scalar_value=scheduler.get_last_lr()[0], global_step=global_step)
                 # save_checkpoint
                 # save_model_complete(args, model, optimizer, accuracy = None, step = global_step)
                 
                 if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
                     accuracy = valid(args, model, writer, test_loader, global_step)
-                    writer.add_scalar("test/acc", scalar_value=accuracy, global_step=global_step)
+                    # writer.add_scalar("test/acc", scalar_value=accuracy, global_step=global_step)
                     if best_acc < accuracy:
                         save_model_complete(args, model, optimizer, accuracy, global_step)
                         best_acc = accuracy
@@ -321,10 +321,10 @@ def main():
                         help="Which variant to use.")
     parser.add_argument("--pretrained_dir", type=str, default="checkpoint/ViT-B_16.npz",
                         help="Where to search for pretrained ViT models.")
-    parser.add_argument("--output_dir", default="/content/drive/MyDrive/ViT_weights_500_continue/", type=str,
+    parser.add_argument("--output_dir", default="/content/best_acc/TrainedModels/", type=str,
                         help="The output directory where checkpoints will be written.")
     parser.add_argument("--output_dir_every_checkpoint", 
-                        default="/content/drive/MyDrive/ViT_weights_layer11_to_end/every_checkpoint/", type=str,
+                        default="/content/every_checkpoint/TrainedModels/", type=str,
                         help="The output directory where checkpoints will be written.")
     # parser.add_argument("--input_dir", 
     #                     default="/content/drive/MyDrive/ViT_weights_layer11_to_end/best_acc_step_500_acc_0.9063629790310919_checkpoint.pth", type=str,
@@ -345,10 +345,10 @@ def main():
                         help="Run prediction on validation set every so many steps."
                              "Will always run one evaluation at the end of training.")
 
-    # parser.add_argument("--learning_rate", default=3e-2, type=float,
-    #                     help="The initial learning rate for SGD.")
-    parser.add_argument("--learning_rate", default=3e-4, type=float,
+    parser.add_argument("--learning_rate", default=3e-2, type=float,
                         help="The initial learning rate for SGD.")
+    # parser.add_argument("--learning_rate", default=3e-4, type=float,
+    #                     help="The initial learning rate for SGD.")
     parser.add_argument("--weight_decay", default=0, type=float,
                         help="Weight deay if we apply some.")
     parser.add_argument("--num_steps", default=10000, type=int,
