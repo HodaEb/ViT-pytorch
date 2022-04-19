@@ -17,7 +17,7 @@ def get_loader(args):
     transform_train = transforms.Compose([
         # transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.05, 1.0)),
         # transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.9, 1.0), ratio=(0.75, 1.3333333333)),
-        transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.3, 1.0), ratio=(0.6, 1.666666666)),
+        transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.8, 1.0), ratio=(0.75, 1.3333333333)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(degrees =(0, 23)),
         transforms.RandomApply([
