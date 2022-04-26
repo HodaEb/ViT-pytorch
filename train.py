@@ -17,6 +17,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from apex import amp
 from apex.parallel import DistributedDataParallel as DDP
+import torchnet as tnt
 
 from models.modeling import VisionTransformer, CONFIGS
 from utils.scheduler import WarmupLinearSchedule, WarmupCosineSchedule
@@ -158,6 +159,47 @@ def valid(args, model, writer, test_loader, global_step):
 
     return accuracy
 
+def mAp(args, model, writer, test_loader, global_step):
+    if global_step == -1:
+        # checkpoint_file = '/content/drive/MyDrive/ViT_acc_90.99/best_acc_step_1100_acc_0.9099783080260304_checkpoint.pth'
+        # checkpoint_file = '/content/drive/MyDrive/ViT_layer_11_to_end/best_acc_step_500_acc_0.9063629790310919_checkpoint.pth'
+        # checkpoint_file = '/content/best_acc/TrainedModels/best_acc_step_100_acc_0.9054591467823572_checkpoint.pth'
+        # checkpoint_file = '/content/best_acc/TrainedModels/best_acc_step_100_acc_0.9070860448300795_checkpoint.pth'
+        checkpoint_file = '/content/best_acc/TrainedModels/best_acc_step_100_acc_0.9081706435285611_checkpoint.pth'
+        checkpoint_continue = torch.load(checkpoint_file)
+        model.load_state_dict(checkpoint_continue['model_state_dict'], strict=True)
+
+    model.eval()
+    class_acc = tnt.meter.APMeter()
+    test_map = tnt.meter.mAPMeter()
+    topacc = tnt.meter.ClassErrorMeter(topk=[1, 5], accuracy=False)
+    conf_matrix = tnt.meter.ConfusionMeter(k=40,  normalized =False)
+    class_acc.reset()
+    test_map.reset()
+    conf_matrix.reset()
+    topacc.reset()
+
+    with torch.no_grad():
+        for x2, y in test_loader:
+
+            x2 = x2.to(args.device)
+            y = y.to(args.device)
+            one_hot_y = torch.nn.functional.one_hot(y, num_classes=40)
+            one_hot_y = one_hot_y.to(args.device)
+            outputs = model(x2)[0]
+            _, preds = torch.max(outputs, 1)
+            probs = torch.nn.functional.softmax(outputs, dim=1)
+            class_acc.add(probs, one_hot_y)
+            test_map.add(probs, one_hot_y)
+            conf_matrix.add(probs, one_hot_y)
+            topacc.add(probs, y)
+            
+    logger.info('class accs are {}'.format(class_acc.value()))
+    logger.info('mAp is equal to {}'.format(test_map.value()))
+    logger.info('confusion matrix is {}'.format(conf_matrix.value()))
+    logger.info('top 1th and 5th acc values are {}'.format(topacc.value()))
+
+    writer.add_scalar("test/mAp", scalar_value=test_map.value(), global_step=global_step)
 
 def train(args, model):
     """ Train the model """
@@ -169,6 +211,7 @@ def train(args, model):
 
     # Prepare dataset
     train_loader, test_loader = get_loader(args)
+
 
   #  # Trainable Parameters
   #   for name, param in model.named_parameters():
@@ -247,6 +290,9 @@ def train(args, model):
     model.zero_grad()
     set_seed(args)  # Added here for reproducibility (even between python 2 and 3)
     losses = AverageMeter()
+
+    mAp(args, model, writer, test_loader, global_step = -1)
+
     # global_step, best_acc = 0, 0
     while True:
         model.train()
@@ -291,6 +337,8 @@ def train(args, model):
                 if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
                     accuracy = valid(args, model, writer, test_loader, global_step)
                     # writer.add_scalar("test/acc", scalar_value=accuracy, global_step=global_step)
+                    mAp(args, model, writer, test_loader, global_step)
+
                     if best_acc < accuracy:
                         save_model_complete(args, model, optimizer, accuracy, global_step)
                         best_acc = accuracy
@@ -401,6 +449,8 @@ def main():
 
     # Model & Tokenizer Setup
     args, model = setup(args)
+
+    
 
     # Training
     train(args, model)
